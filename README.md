@@ -13,7 +13,7 @@ The most significant technical challenge is implementing RPEs within the **linea
 The project requires building and testing three main types of ViT models across two Performer backbone variants.
 
 | Category | Attention Mechanism (Backbone) | RPE Mechanism |
-| :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- |
 | **I. Baseline (Quadratic)** | Regular **Brute-Force Softmax Attention** ($\mathcal{O}(N^2)$) | None (Standard PE) |
 | **II. Efficient Baselines** | **(a) Performer-FAVOR+** (Positive Random Features) | None |
 | | **(b) Performer-ReLU** | None |
