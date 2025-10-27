@@ -12,17 +12,17 @@ The most significant technical challenge is implementing RPEs within the **linea
 
 The project requires building and testing three main types of ViT models across two Performer backbone variants.
 
-| Category | Attention Mechanism (Backbone) | RPE Mechanism | Model Count |
+| Category | Attention Mechanism (Backbone) | RPE Mechanism |
 | :--- | :--- | :--- | :--- |
-| **I. Baseline (Quadratic)** | Regular **Brute-Force Softmax Attention** ($\mathcal{O}(N^2)$) | None (Standard PE) | 1 |
-| **II. Efficient Baselines** | **(a) Performer-FAVOR+** (Positive Random Features) | None | 1 |
-| | **(b) Performer-ReLU** | None | 1 |
-| **III. RPE-Enriched (a)** | Performer-FAVOR+ | **(1) Most General RPE** [Luo et al., 2021] | 3 |
-| | Performer-FAVOR+ | **(2) circulant-STRING** [Schenck et al., 2025] | |
-| | Performer-FAVOR+ | **(3) Regular RoPE** [Su et al., 2024] | |
-| **IV. RPE-Enriched (b)** | Performer-ReLU | **(1) Most General RPE** [Luo et al., 2021] | 3 |
-| | Performer-ReLU | **(2) circulant-STRING** [Schenck et al., 2025] | |
-| | Performer-ReLU | **(3) Regular RoPE** [Su et al., 2024] | |
+| **I. Baseline (Quadratic)** | Regular **Brute-Force Softmax Attention** ($\mathcal{O}(N^2)$) | None (Standard PE) |
+| **II. Efficient Baselines** | **(a) Performer-FAVOR+** (Positive Random Features) | None |
+| | **(b) Performer-ReLU** | None |
+| **III. RPE-Enriched (a)** | Performer-FAVOR+ | **(1) Most General RPE** [Luo et al., 2021] |
+| | Performer-FAVOR+ | **(2) circulant-STRING** [Schenck et al., 2025] |
+| | Performer-FAVOR+ | **(3) Regular RoPE** [Su et al., 2024] |
+| **IV. RPE-Enriched (b)** | Performer-ReLU | **(1) Most General RPE** [Luo et al., 2021] |
+| | Performer-ReLU | **(2) circulant-STRING** [Schenck et al., 2025] |
+| | Performer-ReLU | **(3) Regular RoPE** [Su et al., 2024] |
 
 ## 🧪 Experimental Roadmap
 
