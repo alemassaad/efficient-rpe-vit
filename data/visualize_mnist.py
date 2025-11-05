@@ -84,9 +84,9 @@ def read_idx_labels(file_path):
 
 @st.cache_data
 def load_mnist_data():
-    """Load MNIST data from data/MNIST/raw/ IDX files (cached for performance)"""
+    """Load MNIST data from MNIST/raw/ IDX files (cached for performance)"""
 
-    data_dir = Path('./data/MNIST/raw')
+    data_dir = Path('./MNIST/raw')
 
     # Load training data (prefer uncompressed files, fall back to .gz)
     train_images_path = data_dir / 'train-images-idx3-ubyte'
@@ -197,7 +197,14 @@ def plot_image_grid(images, labels, grid_size=(5, 5), normalize=False, norm_meth
         title_suffix = " (raw)"
 
     for i in range(n_images):
-        axes[i].imshow(display_images[i], cmap='gray')
+        # Set vmin/vmax to prevent auto-scaling and show true normalized values
+        if normalize and norm_method == 'standard':
+            # Standard normalization can have negative values and values > 1
+            # Show the actual range without auto-scaling
+            axes[i].imshow(display_images[i], cmap='gray', vmin=-1, vmax=3)
+        else:
+            # Raw uint8 or minmax [0,1] - use auto-scaling
+            axes[i].imshow(display_images[i], cmap='gray')
         axes[i].set_title(f'Label: {labels[i]}' + title_suffix, fontsize=10)
         axes[i].axis('off')
 
@@ -334,7 +341,7 @@ def main():
     st.sidebar.markdown("""
     **About:**
 
-    This dashboard visualizes the MNIST handwritten digit dataset loaded from `data/MNIST/` (torchvision format).
+    This dashboard visualizes the MNIST handwritten digit dataset loaded from `MNIST/raw/` (IDX binary format).
 
     - **Raw images**: uint8 pixels (0-255)
     - **Training set**: 60,000 images
