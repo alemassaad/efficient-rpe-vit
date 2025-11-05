@@ -1,0 +1,28 @@
+# Core deep learning framework
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Scientific computing
+# Note: NumPy 2.x is not compatible with PyTorch 2.2.x
+# Use NumPy 1.x until upgrading to PyTorch 2.3+
+numpy>=1.24.0,<2.0
+
+# Metrics and evaluation
+scikit-learn>=1.3.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# Optional: Progress bars (recommended for training)
+tqdm>=4.65.0
+
+# Optional: Advanced plotting (for experiment comparisons)
+seaborn>=0.12.0
+
+# Optional: Data management and results tables
+pandas>=2.0.0
+
+# Optional: FLOPs calculation (for performance analysis)
+# Uncomment if needed for computational complexity analysis:
+# fvcore>=0.1.5
+# thop>=0.1.1

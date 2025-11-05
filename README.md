@@ -48,3 +48,75 @@ We will compare all 10 model variants across a comprehensive set of accuracy, fi
 ## 💡 Expected Outcome
 
 The final goal is to determine if RPEs can effectively **close the accuracy gap** between the standard ViT and the highly efficient Performer-ViT variants, validating the approach with rigorous testing of both speed and performance.
+
+## 🛠️ Getting Started
+
+### Environment Setup
+
+**Step 1: Create Virtual Environment**
+```bash
+# Create the virtual environment
+python -m venv vit-env
+```
+
+**Step 2: Activate the Environment**
+```bash
+# On macOS/Linux:
+source vit-env/bin/activate
+
+# On Windows:
+vit-env\Scripts\activate
+```
+
+**Step 3: Install Dependencies**
+```bash
+# Upgrade pip (recommended)
+pip install --upgrade pip
+
+# Install all required packages
+pip install -r requirements.txt
+```
+
+**Step 4: Verify Installation**
+```bash
+# Check PyTorch installation
+python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
+
+# Check CUDA availability (for GPU support)
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+```
+
+### Quick Start
+
+Once your environment is set up, you can train models:
+
+```bash
+# Train baseline ViT on MNIST
+python experiments/train_baseline.py --dataset mnist
+
+# Train with full outputs (checkpoints, metrics, plots)
+python experiments/train_baseline.py --dataset mnist \
+    --save-model \
+    --save-metrics \
+    --plot \
+    --save-plots
+
+# Train on CIFAR-10
+python experiments/train_baseline.py --dataset cifar10 --epochs 20
+```
+
+### Running Tests
+```bash
+# Test model architecture
+python test_model.py
+
+# Test training functionality
+python test_training.py
+```
+
+### Deactivating the Environment
+```bash
+# When done working
+deactivate
+```
+
