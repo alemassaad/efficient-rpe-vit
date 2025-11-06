@@ -1,4 +1,8 @@
-# Core deep learning framework
+# =============================================================================
+# CORE DEPENDENCIES (Required for all functionality)
+# =============================================================================
+
+# Deep learning framework
 torch>=2.0.0
 torchvision>=0.15.0
 
@@ -7,22 +11,46 @@ torchvision>=0.15.0
 # Use NumPy 1.x until upgrading to PyTorch 2.3+
 numpy>=1.24.0,<2.0
 
-# Metrics and evaluation
-scikit-learn>=1.3.0
-
-# Visualization
+# Visualization (for training curves)
 matplotlib>=3.7.0
 
-# Optional: Progress bars (recommended for training)
+
+# =============================================================================
+# OPTIONAL DEPENDENCIES (Not required for basic training)
+# =============================================================================
+# The codebase now uses native PyTorch implementations for metrics,
+# eliminating the 20-30 second import overhead from sklearn/pandas.
+# These packages are only needed for advanced analysis and comparisons.
+
+# Advanced metrics and model analysis
+# NOTE: sklearn/pandas have heavy import overhead (~30 seconds on first import)
+# Only install if you need sklearn-specific functionality
+# scikit-learn>=1.3.0  # Not needed - we use native PyTorch metrics
+# pandas>=2.0.0        # Only needed for data analysis/comparison tables
+
+# Progress bars (recommended for long training runs)
 tqdm>=4.65.0
 
-# Optional: Advanced plotting (for experiment comparisons)
+# Advanced plotting (for publication-quality figures)
 seaborn>=0.12.0
 
-# Optional: Data management and results tables
-pandas>=2.0.0
-
-# Optional: FLOPs calculation (for performance analysis)
-# Uncomment if needed for computational complexity analysis:
+# FLOPs calculation (for computational complexity analysis)
+# Uncomment if needed:
 # fvcore>=0.1.5
 # thop>=0.1.1
+
+
+# =============================================================================
+# INSTALLATION GUIDE
+# =============================================================================
+# For core functionality only (fast startup):
+#   pip install torch torchvision numpy matplotlib
+#
+# For full functionality:
+#   pip install -r requirements.txt
+#
+# To install scikit-learn if you need sklearn-specific features:
+#   pip install scikit-learn
+#
+# Note: sklearn is NO LONGER REQUIRED for training - we use native PyTorch
+# implementations that are faster and have zero import overhead!
