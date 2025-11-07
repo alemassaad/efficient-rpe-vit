@@ -1,53 +1,56 @@
 # Efficient-RPE-ViT: Improving Performer Vision Transformers with Relative Positional Encodings
 
-## 🚀 Project Goal
+## Project Objective
 
-The objective of this project is to address the accuracy gap between standard Vision Transformers (ViT) and highly efficient **Performer-based ViTs** (which use linear attention) by integrating various **Relative Positional Encodings (RPEs)**. We devise and test efficient RPE implementations specifically tailored for the linear Performer attention mechanism.
+This project investigates the downstream accuracy improvement of Vision Transformers (ViTs) utilizing Performer architectures through integration with various Relative Positional Encoding (RPE) methods. The study examines small ViT models with Performer backbones for attention computation, considering two Performer variants: (a) models leveraging positive random features for unbiased approximation of the softmax kernel (FAVOR+), and (b) Performer-ReLU architectures. The Performer-ViT models are enriched with three RPE mechanisms: (1) kernelized attention with relative positional encoding [Luo et al., 2021], (2) circulant-STRING [Schenck et al., 2025], and (3) rotary position embedding (RoPE) [Su et al., 2024]. Efficient implementations of these RPE-enriched Performers are provided and compared against standard brute-force attention ViT. The central research question examines whether RPE integration can effectively close the accuracy gap between standard ViT and Performer variants. Experimental validation is conducted on MNIST and CIFAR-10 datasets, with comprehensive comparison of training time, inference time, and classification accuracy across all model variants.
 
-## 🧠 Core Challenge: RPE-Performer Fusion
+## Core Technical Challenge
 
-The most significant technical challenge is implementing RPEs within the **linear $\mathcal{O}(N)$ attention** of the Performer. Standard RPEs operate on the quadratic $\mathbf{Q K}^\top$ attention matrix. Our work will focus on creating **efficient RPE-Performer fusions** that maintain the computational gains of the Performer while incorporating the relational context provided by RPEs.
+The primary technical challenge involves implementing RPE mechanisms within the linear $\mathcal{O}(N)$ attention framework of the Performer architecture. Standard RPE methods operate on the quadratic $\mathbf{Q K}^\top$ attention matrix, requiring adaptation for efficient integration with kernelized attention mechanisms. This work focuses on developing efficient RPE-Performer fusion approaches that preserve the computational advantages of linear attention while incorporating the positional information encoded by RPE methods.
 
-## 🛠️ Models to Implement and Compare (9 Total)
+## Model Architectures
 
-The project requires building and testing three main types of ViT models across two Performer backbone variants.
+The experimental framework encompasses twelve model variants combining three attention mechanisms with four positional encoding approaches.
 
-| Category | Attention Mechanism (Backbone) | RPE Mechanism |
+| Category | Attention Mechanism | RPE Mechanism | Complexity |
+| :--- | :--- | :--- | :--- |
+| **Baseline (Quadratic)** | Brute-Force Softmax Attention | None (Absolute PE) | $\mathcal{O}(N^2)$ |
+| | Brute-Force Softmax Attention | Kernelized RPE [Luo et al., 2021] | $\mathcal{O}(N^2)$ |
+| | Brute-Force Softmax Attention | Circulant-STRING [Schenck et al., 2025] | $\mathcal{O}(N^2)$ |
+| | Brute-Force Softmax Attention | RoPE [Su et al., 2024] | $\mathcal{O}(N^2)$ |
+| **Performer-FAVOR+** | Positive Random Features | None (Absolute PE) | $\mathcal{O}(N)$ |
+| | Positive Random Features | Kernelized RPE [Luo et al., 2021] | $\mathcal{O}(N \log N)$ |
+| | Positive Random Features | Circulant-STRING [Schenck et al., 2025] | $\mathcal{O}(N)$ |
+| | Positive Random Features | RoPE [Su et al., 2024] | $\mathcal{O}(N)$ |
+| **Performer-ReLU** | ReLU Kernel Approximation | None (Absolute PE) | $\mathcal{O}(N)$ |
+| | ReLU Kernel Approximation | Kernelized RPE [Luo et al., 2021] | $\mathcal{O}(N \log N)$ |
+| | ReLU Kernel Approximation | Circulant-STRING [Schenck et al., 2025] | $\mathcal{O}(N)$ |
+| | ReLU Kernel Approximation | RoPE [Su et al., 2024] | $\mathcal{O}(N)$ |
+
+## Experimental Design
+
+### Datasets
+All model variants are trained and evaluated on two benchmark image classification datasets:
+1. MNIST (28×28 grayscale handwritten digits, 10 classes)
+2. CIFAR-10 (32×32 RGB natural images, 10 classes)
+
+### Evaluation Metrics
+Comprehensive evaluation across computational efficiency, predictive performance, and model fit:
+
+| Metric Category | Specific Metrics | Description |
 | :--- | :--- | :--- |
-| **I. Baseline (Quadratic)** | Regular **Brute-Force Softmax Attention** ($\mathcal{O}(N^2)$) | None (Standard PE) |
-| **II. Efficient Baselines** | **(a) Performer-FAVOR+** (Positive Random Features) | None |
-| | **(b) Performer-ReLU** | None |
-| **III. RPE-Enriched (a)** | Performer-FAVOR+ | **(1) Most General RPE** [Luo et al., 2021] |
-| | Performer-FAVOR+ | **(2) circulant-STRING** [Schenck et al., 2025] |
-| | Performer-FAVOR+ | **(3) Regular RoPE** [Su et al., 2024] |
-| **IV. RPE-Enriched (b)** | Performer-ReLU | **(1) Most General RPE** [Luo et al., 2021] |
-| | Performer-ReLU | **(2) circulant-STRING** [Schenck et al., 2025] |
-| | Performer-ReLU | **(3) Regular RoPE** [Su et al., 2024] |
+| **Computational Efficiency** | Training Time (seconds/epoch) | Per-epoch training duration |
+| | Inference Time (milliseconds/sample) | Average prediction latency |
+| | FLOPs | Theoretical computational complexity |
+| **Classification Performance** | Top-1 Accuracy | Primary classification metric |
+| | Precision, Recall, F1-Score | Per-class performance measures |
+| **Statistical Model Fit** | Log-Likelihood ($\hat{\mathcal{L}}$) | Model fit quality |
+| | AIC (Akaike Information Criterion) | Fit-complexity trade-off |
+| | BIC (Bayesian Information Criterion) | Conservative model selection criterion |
+| **Model Properties** | Parameter Count | Total number of trainable parameters |
 
-## 🧪 Experimental Roadmap
-
-### A. Datasets
-All models will be trained and evaluated on:
-1.  **MNIST**
-2.  **CIFAR-10**
-
-### B. Evaluation Metrics
-We will compare all 10 model variants across a comprehensive set of accuracy, fit, and efficiency metrics.
-
-| Focus Area | Key Metrics to Measure | Purpose |
-| :--- | :--- | :--- |
-| **Computational Efficiency (Primary Focus)** | **Inference Time** (Average per Sample) | Measure real-world speed/latency. |
-| | **Training Time** (Per Epoch) | Evaluate overall training cost. |
-| | **FLOPs** (Floating Point Operations) | Theoretical computational complexity. |
-| **Predictive Performance** | **Top-1 Accuracy**, Precision, Recall, F1-Score | Standard deep learning classification results. |
-| **Statistical Model Fit** | **Log-Likelihood** ($\hat{\mathcal{L}}$) | Foundation for fit criteria. |
-| | **AIC** (Akaike Information Criterion) | Assess trade-off between fit and complexity. |
-| | **BIC** (Bayesian Information Criterion) | Penalizes complexity more aggressively than AIC. |
-| **Model Complexity** | **Model Size** (Number of Parameters, $k$) | Parameter count. |
-
-## 💡 Expected Outcome
-
-The final goal is to determine if RPEs can effectively **close the accuracy gap** between the standard ViT and the highly efficient Performer-ViT variants, validating the approach with rigorous testing of both speed and performance.
+### Research Question
+Can RPE mechanisms effectively reduce or eliminate the accuracy gap between standard brute-force attention ViT and computationally efficient Performer-ViT variants, while preserving the linear complexity advantages of kernelized attention?
 
 ## 🛠️ Getting Started
 
@@ -125,4 +128,15 @@ python test_training.py
 # When done working
 deactivate
 ```
+
+## References
+
+**[Luo et al., 2021]** Luo, S., Li, S., Cai, T., He, D., Peng, D., Zheng, S., Ke, G., Wang, L., and Liu, T. (2021). Stable, fast and accurate: Kernelized attention with relative positional encoding. In Ranzato, M., Beygelzimer, A., Dauphin, Y. N., Liang, P., and Vaughan, J. W., editors, *Advances in Neural Information Processing Systems 34: Annual Conference on Neural Information Processing Systems 2021, NeurIPS 2021*, December 6-14, 2021, virtual, pages 22795–22807.
+📄 **Local PDF**: [`2106.12566v2.pdf`](./2106.12566v2.pdf) | arXiv: [2106.12566](https://arxiv.org/abs/2106.12566)
+
+**[Schenck et al., 2025]** Schenck, C., Reid, I., Jacob, M. G., Bewley, A., Ainslie, J., Rendleman, D., Jain, D., Sharma, M., Dubey, A., Wahid, A., Singh, S., Wagner, R., Ding, T., Fu, C., Byravan, A., Varley, J., Gritsenko, A. A., Minderer, M., Kalashnikov, D., Tompson, J., Sindhwani, V., and Choromanski, K. (2025). Learning the ropes: Better 2d and 3d position encodings with STRING. *ICML 2025*, abs/2502.02562.
+📄 **Local PDF**: [`2502.02562v1.pdf`](./2502.02562v1.pdf) | arXiv: [2502.02562](https://arxiv.org/abs/2502.02562)
+
+**[Su et al., 2024]** Su, J., Ahmed, M., Lu, Y., Pan, S., Bo, W., and Liu, Y. (2024). Roformer: Enhanced transformer with rotary position embedding. *Neurocomputing*, 568:127063.
+📄 **Local PDF**: [`2104.09864v5.pdf`](./2104.09864v5.pdf) | arXiv: [2104.09864](https://arxiv.org/abs/2104.09864)
 
