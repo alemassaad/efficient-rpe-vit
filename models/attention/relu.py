@@ -1,31 +1,40 @@
 """
-ReLU-based linear attention mechanism.
+ReLU-based linear attention mechanism (Performer-ReLU).
 
-This module implements a stub for ReLU attention, which is another
-linear complexity attention variant mentioned in the Performer paper.
+This module implements linear O(N) attention using ReLU kernel with orthogonal
+random features as described in Choromanski et al., 2020 (Performer-ReLU variant).
 """
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import math
 from typing import Optional, Union, Tuple
 from .base import BaseAttention
 
 
 class ReLUAttention(BaseAttention):
     """
-    ReLU-based linear attention (stub implementation).
+    Performer-ReLU: Linear attention with ReLU kernel.
 
-    This is a placeholder for the ReLU attention variant of the Performer,
-    which uses ReLU activation as the kernel function instead of exponential.
+    This implements the Performer's linear attention mechanism using ReLU
+    kernel instead of softmax, achieving O(N) complexity. Uses the same
+    FAVOR+ framework but replaces exp with ReLU activation.
 
-    The actual implementation will be added when the specific requirements
-    and mathematical formulation are clarified.
+    The key idea is to use ReLU kernel decomposition:
+    ReLU(q @ k^T) ≈ φ(q) @ φ(k)^T where φ(x) = ReLU(Ω^T x) / √m
+
+    Reference: Choromanski et al., 2020, "Rethinking Attention with Performers"
+    (Performer-ReLU variant using generalized attention with ReLU kernel)
 
     Args:
         dim: Model dimension
         heads: Number of attention heads
         dropout: Dropout rate
-        **kwargs: Additional parameters for future implementation
+        num_features: Number of random features (None for auto d*log(d))
+        use_orthogonal: Whether to use orthogonal random features
+        feature_redraw_interval: How often to redraw features during training
+        qkv_bias: Whether to use bias in QKV projection
     """
 
     def __init__(
@@ -33,17 +42,100 @@ class ReLUAttention(BaseAttention):
         dim: int,
         heads: int,
         dropout: float = 0.0,
-        **kwargs
+        num_features: Optional[int] = None,
+        use_orthogonal: bool = True,
+        feature_redraw_interval: Optional[int] = None,
+        qkv_bias: bool = False
     ):
         super().__init__(dim, heads, dropout)
 
-        # Store any additional parameters for future use
-        self.additional_params = kwargs
+        # ReLU attention specific parameters (same as FAVOR+)
+        if num_features is None:
+            # Auto-compute based on Performer paper recommendation
+            num_features = int(self.head_dim * math.log(self.head_dim))
+        self.num_features = num_features
+        self.use_orthogonal = use_orthogonal
+        self.feature_redraw_interval = feature_redraw_interval
 
-        # Placeholder for QKV and projection layers
-        self.qkv = nn.Linear(dim, dim * 3, bias=False)
+        # QKV projection
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+
+        # Output projection
         self.proj = nn.Linear(dim, dim)
         self.proj_dropout = nn.Dropout(dropout)
+
+        # Random features for ReLU attention (same as FAVOR+)
+        self._create_random_features()
+
+        # Redraw counter for training
+        self.register_buffer('redraw_counter', torch.tensor(0))
+
+        # Scaling for ReLU attention (same as FAVOR+)
+        self.relu_scale = self.head_dim ** -0.25  # d^(-1/4) for both Q and K
+
+    def _create_random_features(self):
+        """Create random feature matrix Ω for ReLU attention."""
+        # Create random features for each head
+        # Shape: (heads, head_dim, num_features)
+        if self.use_orthogonal:
+            self.register_buffer('omega', self._create_orthogonal_features())
+        else:
+            omega = torch.randn(self.heads, self.head_dim, self.num_features)
+            self.register_buffer('omega', omega)
+
+    def _create_orthogonal_features(self) -> torch.Tensor:
+        """
+        Create orthogonal random features using QR decomposition.
+
+        This provides lower variance compared to i.i.d. Gaussian features.
+        Same implementation as FAVOR+ for consistency.
+        """
+        omega_list = []
+
+        for _ in range(self.heads):
+            if self.num_features <= self.head_dim:
+                # Simple case: can get orthogonal features directly
+                gaussian = torch.randn(self.head_dim, self.num_features)
+                q, _ = torch.linalg.qr(gaussian, mode='reduced')
+                omega = q * math.sqrt(self.head_dim)
+            else:
+                # Need multiple orthogonal blocks
+                num_blocks = math.ceil(self.num_features / self.head_dim)
+                blocks = []
+                for _ in range(num_blocks):
+                    gaussian = torch.randn(self.head_dim, self.head_dim)
+                    q, _ = torch.linalg.qr(gaussian, mode='reduced')
+                    blocks.append(q)
+                omega = torch.cat(blocks, dim=1)[:, :self.num_features]
+                omega = omega * math.sqrt(self.head_dim)
+
+            omega_list.append(omega)
+
+        return torch.stack(omega_list, dim=0)  # (heads, head_dim, num_features)
+
+    def _compute_relu_features(self, x: torch.Tensor, omega: torch.Tensor) -> torch.Tensor:
+        """
+        Compute ReLU random features φ(x) = ReLU(Ω^T x) / √m.
+
+        This is the key difference from FAVOR+: uses ReLU instead of exp.
+        Much simpler than FAVOR+ - no exp, no norm subtraction, no max trick.
+
+        Args:
+            x: Input of shape (B, heads, N, head_dim)
+            omega: Random features of shape (heads, head_dim, num_features)
+
+        Returns:
+            ReLU features of shape (B, heads, N, num_features)
+        """
+        # Project x onto random features: x @ omega
+        # (B, heads, N, head_dim) @ (heads, head_dim, num_features) -> (B, heads, N, num_features)
+        proj = torch.einsum('bhnd,hdf->bhnf', x, omega)
+
+        # Apply ReLU and normalize (key difference from FAVOR+)
+        # No exp, no norm subtraction needed - ReLU is naturally stable
+        phi = F.relu(proj) / math.sqrt(self.num_features)
+
+        return phi
 
     def forward(
         self,
@@ -52,25 +144,74 @@ class ReLUAttention(BaseAttention):
         return_attention: bool = False
     ) -> torch.Tensor:
         """
-        Compute ReLU attention (not implemented).
+        Compute Performer-ReLU linear attention.
 
         Args:
             x: Input tensor of shape (batch, seq_len, dim)
-            mask: Optional attention mask
-            return_attention: Whether to return attention weights
+            mask: Optional attention mask (currently not supported for linear attention)
+            return_attention: Not applicable for linear attention (no explicit attention matrix)
 
         Returns:
             Output tensor of shape (batch, seq_len, dim)
-
-        Raises:
-            NotImplementedError: This is a stub implementation
         """
-        raise NotImplementedError(
-            "ReLU attention is not yet implemented. "
-            "This is a placeholder for future development. "
-            "Please use 'softmax' or 'favor_plus' attention types instead."
-        )
+        B, N, C = x.shape
+
+        # Optionally redraw features during training
+        if self.training and self.feature_redraw_interval is not None:
+            if self.redraw_counter % self.feature_redraw_interval == 0:
+                self._create_random_features()
+            self.redraw_counter += 1
+
+        # Generate Q, K, V
+        qkv = self.qkv(x).reshape(B, N, 3, self.heads, self.head_dim)
+        qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, heads, N, head_dim)
+        q, k, v = qkv[0], qkv[1], qkv[2]  # Each: (B, heads, N, head_dim)
+
+        # Apply d^(-1/4) scaling to both Q and K (same as FAVOR+)
+        q = q * self.relu_scale
+        k = k * self.relu_scale
+
+        # Compute ReLU random features (key difference from FAVOR+)
+        q_prime = self._compute_relu_features(q, self.omega)  # (B, heads, N, num_features)
+        k_prime = self._compute_relu_features(k, self.omega)  # (B, heads, N, num_features)
+
+        # Linear attention computation: O(N) complexity
+        # Step 1: Compute K'^T @ V
+        # (B, heads, num_features, N) @ (B, heads, N, head_dim) -> (B, heads, num_features, head_dim)
+        kv = torch.einsum('bhnf,bhnd->bhfd', k_prime, v)
+
+        # Step 2: Compute Q' @ (K'^T @ V)
+        # (B, heads, N, num_features) @ (B, heads, num_features, head_dim) -> (B, heads, N, head_dim)
+        out_numerator = torch.einsum('bhnf,bhfd->bhnd', q_prime, kv)
+
+        # Step 3: Compute normalization denominator
+        # Sum of k_prime over sequence dimension
+        k_prime_sum = k_prime.sum(dim=2)  # (B, heads, num_features)
+        # Q' @ sum(K')
+        out_denominator = torch.einsum('bhnf,bhf->bhn', q_prime, k_prime_sum)
+
+        # Step 4: Normalize (add small epsilon for stability)
+        out = out_numerator / (out_denominator.unsqueeze(-1) + 1e-6)
+
+        # Reshape and project output
+        out = out.transpose(1, 2).reshape(B, N, C)  # (B, N, C)
+        out = self.proj(out)
+        out = self.proj_dropout(out)
+
+        if return_attention:
+            # Linear attention doesn't compute explicit attention matrices
+            # Could approximate if needed, but would defeat the purpose
+            raise NotImplementedError(
+                "ReLU linear attention doesn't compute explicit attention matrices. "
+                "Returning attention weights would require O(N²) computation."
+            )
+
+        return out
 
     def extra_repr(self) -> str:
-        """String representation."""
-        return super().extra_repr() + ', complexity=O(N), status=NOT_IMPLEMENTED'
+        """String representation with ReLU attention parameters."""
+        return (
+            super().extra_repr() +
+            f', complexity=O(N), num_features={self.num_features}, '
+            f'orthogonal={self.use_orthogonal}, kernel=ReLU'
+        )

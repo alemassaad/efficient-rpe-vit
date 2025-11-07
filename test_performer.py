@@ -20,6 +20,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from models.attention.favor_plus import FAVORPlusAttention
+from models.attention.relu import ReLUAttention
 from models import create_model
 from configs.datasets.mnist import MNIST_CONFIG
 from configs.datasets.cifar10 import CIFAR10_CONFIG
@@ -411,6 +412,146 @@ class TestMemoryEfficiency(unittest.TestCase):
                           "FAVOR+ not showing better memory scaling")
 
 
+class TestReLUAttention(unittest.TestCase):
+    """Test ReLU attention mechanism (Performer-ReLU)."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.dim = 64
+        self.heads = 4
+        self.seq_len = 16
+        self.batch_size = 2
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    def test_relu_attention_forward(self):
+        """Test ReLU attention forward pass."""
+        attention = ReLUAttention(
+            dim=self.dim,
+            heads=self.heads,
+            use_orthogonal=True
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+        output = attention(x)
+
+        # Check output shape
+        self.assertEqual(output.shape, (self.batch_size, self.seq_len, self.dim))
+
+        # Check no NaN or Inf
+        self.assertFalse(torch.isnan(output).any())
+        self.assertFalse(torch.isinf(output).any())
+
+    def test_relu_features_non_negative(self):
+        """Test that ReLU features are non-negative."""
+        attention = ReLUAttention(
+            dim=self.dim,
+            heads=self.heads,
+            use_orthogonal=True
+        ).to(self.device)
+
+        # Create random input
+        x = torch.randn(self.batch_size, self.heads, self.seq_len, self.dim // self.heads).to(self.device)
+
+        # Compute ReLU features
+        features = attention._compute_relu_features(x, attention.omega)
+
+        # Check all features are non-negative (ReLU output)
+        self.assertTrue((features >= 0).all(), "ReLU features should be non-negative")
+
+    def test_relu_attention_gradient_flow(self):
+        """Test gradient flow through ReLU attention."""
+        attention = ReLUAttention(
+            dim=self.dim,
+            heads=self.heads,
+            use_orthogonal=True
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+        x.requires_grad = True
+
+        output = attention(x)
+        loss = output.sum()
+        loss.backward()
+
+        # Check gradients exist
+        self.assertIsNotNone(x.grad)
+        self.assertFalse(torch.isnan(x.grad).any())
+
+        # Check parameter gradients
+        for name, param in attention.named_parameters():
+            if param.requires_grad:
+                self.assertIsNotNone(param.grad, f"No gradient for {name}")
+                self.assertFalse(torch.isnan(param.grad).any(), f"NaN gradient in {name}")
+
+    def test_relu_vs_favor_architecture(self):
+        """Test that ReLU attention uses same architecture as FAVOR+."""
+        relu_attn = ReLUAttention(
+            dim=self.dim,
+            heads=self.heads,
+            num_features=64,
+            use_orthogonal=True
+        ).to(self.device)
+
+        favor_attn = FAVORPlusAttention(
+            dim=self.dim,
+            heads=self.heads,
+            num_features=64,
+            use_orthogonal=True
+        ).to(self.device)
+
+        # Check same number of features
+        self.assertEqual(relu_attn.num_features, favor_attn.num_features)
+
+        # Check same omega shape
+        self.assertEqual(relu_attn.omega.shape, favor_attn.omega.shape)
+
+        # Check same scaling
+        self.assertEqual(relu_attn.relu_scale, favor_attn.favor_scale)
+
+    def test_performer_relu_model_creation(self):
+        """Test creating performer_relu model via factory."""
+        model = create_model('performer_relu', MNIST_CONFIG)
+
+        self.assertIsNotNone(model)
+
+        # Test forward pass
+        x = torch.randn(2, 1, 28, 28)
+        output = model(x)
+
+        self.assertEqual(output.shape, (2, 10))
+        self.assertFalse(torch.isnan(output).any())
+
+    def test_relu_attention_with_different_seq_lengths(self):
+        """Test ReLU attention with various sequence lengths."""
+        attention = ReLUAttention(
+            dim=self.dim,
+            heads=self.heads,
+            use_orthogonal=True
+        ).to(self.device)
+
+        for seq_len in [4, 16, 64, 256]:
+            x = torch.randn(self.batch_size, seq_len, self.dim).to(self.device)
+            output = attention(x)
+
+            self.assertEqual(output.shape, (self.batch_size, seq_len, self.dim))
+            self.assertFalse(torch.isnan(output).any())
+
+    def test_relu_attention_orthogonal_vs_iid(self):
+        """Test both orthogonal and i.i.d. random features."""
+        for use_orthogonal in [True, False]:
+            attention = ReLUAttention(
+                dim=self.dim,
+                heads=self.heads,
+                use_orthogonal=use_orthogonal
+            ).to(self.device)
+
+            x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+            output = attention(x)
+
+            self.assertEqual(output.shape, (self.batch_size, self.seq_len, self.dim))
+            self.assertFalse(torch.isnan(output).any())
+
+
 def run_tests():
     """Run all tests."""
     # Create test suite
@@ -423,6 +564,7 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestPerformerViT))
     suite.addTests(loader.loadTestsFromTestCase(TestApproximationQuality))
     suite.addTests(loader.loadTestsFromTestCase(TestMemoryEfficiency))
+    suite.addTests(loader.loadTestsFromTestCase(TestReLUAttention))
 
     # Run tests
     runner = unittest.TextTestRunner(verbosity=2)

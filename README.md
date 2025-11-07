@@ -56,16 +56,19 @@ The final goal is to determine if RPEs can effectively **close the accuracy gap*
 **Step 1: Create Virtual Environment**
 ```bash
 # Create the virtual environment
-python -m venv vit-env
+python -m venv .venv
 ```
 
 **Step 2: Activate the Environment**
 ```bash
 # On macOS/Linux:
-source vit-env/bin/activate
+source .venv/bin/activate
 
 # On Windows:
-vit-env\Scripts\activate
+.venv\Scripts\activate
+
+# OR use the automated init script (macOS/Linux only):
+source .claude/init.sh
 ```
 
 **Step 3: Install Dependencies**
@@ -84,6 +87,9 @@ python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
 
 # Check CUDA availability (for GPU support)
 python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+
+# List available model variants
+python -c "from models import list_available_models; print('Available models:', list_available_models())"
 ```
 
 ### Quick Start
