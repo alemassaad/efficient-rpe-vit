@@ -25,7 +25,7 @@ from .attention import (
     ATTENTION_REGISTRY
 )
 from .rpe import (
-    MostGeneralRPE,
+    KERPLEPositionalEncoding,
     CirculantStringRPE,
     RoPE,
     RPE_REGISTRY
@@ -48,7 +48,7 @@ __all__ = [
     'ATTENTION_REGISTRY',
 
     # RPE mechanisms
-    'MostGeneralRPE',
+    'KERPLEPositionalEncoding',
     'CirculantStringRPE',
     'RoPE',
     'RPE_REGISTRY',

@@ -46,6 +46,7 @@ class SoftmaxAttention(BaseAttention):
         self,
         x: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
+        rpe: Optional[nn.Module] = None,
         return_attention: bool = False
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
@@ -54,12 +55,33 @@ class SoftmaxAttention(BaseAttention):
         Args:
             x: Input tensor of shape (batch, seq_len, dim)
             mask: Optional attention mask of shape (batch, seq_len, seq_len)
+            rpe: Optional RPE module (KERPLE not supported for softmax)
             return_attention: If True, also return attention weights
 
         Returns:
             Output tensor of shape (batch, seq_len, dim)
             Optionally returns attention weights of shape (batch, heads, seq_len, seq_len)
+
+        Raises:
+            NotImplementedError: If KERPLE RPE is provided (incompatible with softmax)
         """
+        # Check if KERPLE RPE is being used
+        if rpe is not None:
+            from ..rpe import KERPLEPositionalEncoding
+            if isinstance(rpe, KERPLEPositionalEncoding):
+                raise NotImplementedError(
+                    "KERPLE RPE is designed specifically for kernelized attention "
+                    "(FAVOR+/ReLU Performer) and cannot be used with standard softmax attention. "
+                    "KERPLE requires linear attention mechanisms to achieve O(n log n) complexity. "
+                    "For softmax attention, consider using other RPE types like Shaw et al. 2018."
+                )
+            # For future RPE types compatible with softmax, we could handle them here
+            # For now, reject any RPE
+            raise NotImplementedError(
+                "RPE integration with softmax attention is not yet implemented. "
+                "Currently only KERPLE is implemented, which requires kernelized attention."
+            )
+
         B, N, C = x.shape
 
         # Generate Q, K, V

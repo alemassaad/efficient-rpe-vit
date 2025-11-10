@@ -132,8 +132,10 @@ class BaseViT(nn.Module):
         # Build RPE module if provided
         rpe = None
         if rpe_builder is not None:
+            # NOTE: num_patches + 1 to account for CLS token
+            # After adding CLS token, sequence length is num_patches + 1
             rpe = rpe_builder(
-                num_patches=self.num_patches,
+                num_patches=self.num_patches + 1,
                 dim=self.dim,
                 heads=self.heads
             )

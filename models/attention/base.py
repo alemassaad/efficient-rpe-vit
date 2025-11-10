@@ -46,6 +46,7 @@ class BaseAttention(ABC, nn.Module):
         self,
         x: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
+        rpe: Optional[nn.Module] = None,
         return_attention: bool = False
     ) -> torch.Tensor:
         """
@@ -54,6 +55,9 @@ class BaseAttention(ABC, nn.Module):
         Args:
             x: Input tensor of shape (batch, seq_len, dim)
             mask: Optional attention mask
+            rpe: Optional Relative Positional Encoding module
+                 For kernelized attention (FAVOR+/ReLU): accepts KERPLE
+                 For softmax attention: may accept other RPE types
             return_attention: Whether to return attention weights (if applicable)
 
         Returns:

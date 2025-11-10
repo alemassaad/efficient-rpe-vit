@@ -68,8 +68,12 @@ def train_epoch(
         total += labels.size(0)
         correct += predicted.eq(labels).sum().item()
 
-        # Log progress
-        if batch_idx % log_interval == 0:
+        # Log progress every 2%
+        current_pct = int((batch_idx / len(train_loader)) * 100)
+        prev_pct = int(((batch_idx - 1) / len(train_loader)) * 100) if batch_idx > 0 else -1
+
+        # Print when percentage crosses a 2% boundary
+        if batch_idx == 0 or (current_pct // 2) > (prev_pct // 2):
             elapsed = time.time() - global_start_time if global_start_time else 0
             print(f'[{elapsed:6.1f}s] Train Epoch: {epoch} [{batch_idx}/{len(train_loader)} '
                   f'({100. * batch_idx / len(train_loader):.0f}%)]\t'
@@ -138,8 +142,12 @@ def evaluate(
             test_loss += loss.item()
             _, predicted = outputs.max(1)
 
-            # Log progress
-            if batch_idx % log_interval == 0:
+            # Log progress every 2%
+            current_pct = int((batch_idx / len(test_loader)) * 100)
+            prev_pct = int(((batch_idx - 1) / len(test_loader)) * 100) if batch_idx > 0 else -1
+
+            # Print when percentage crosses a 2% boundary
+            if batch_idx == 0 or (current_pct // 2) > (prev_pct // 2):
                 elapsed = time.time() - global_start_time if global_start_time else 0
                 epoch_str = f" Epoch: {epoch}" if epoch is not None else ""
                 print(f'[{elapsed:6.1f}s] Test{epoch_str} [{batch_idx}/{len(test_loader)} '

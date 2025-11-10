@@ -141,14 +141,16 @@ class ReLUAttention(BaseAttention):
         self,
         x: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
+        rpe: Optional[nn.Module] = None,
         return_attention: bool = False
     ) -> torch.Tensor:
         """
-        Compute Performer-ReLU linear attention.
+        Compute Performer-ReLU linear attention with optional KERPLE RPE.
 
         Args:
             x: Input tensor of shape (batch, seq_len, dim)
             mask: Optional attention mask (currently not supported for linear attention)
+            rpe: Optional KERPLE RPE module for O(n log n) relative positional encoding
             return_attention: Not applicable for linear attention (no explicit attention matrix)
 
         Returns:
@@ -167,28 +169,61 @@ class ReLUAttention(BaseAttention):
         qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, heads, N, head_dim)
         q, k, v = qkv[0], qkv[1], qkv[2]  # Each: (B, heads, N, head_dim)
 
-        # Apply d^(-1/4) scaling to both Q and K (same as FAVOR+)
-        q = q * self.relu_scale
-        k = k * self.relu_scale
+        # CRITICAL: Q/K normalization when using KERPLE RPE
+        # From Luo et al., 2021, Section 3.3 and Theorem 3:
+        # Normalization is REQUIRED for training stability with kernelized attention + RPE
+        if rpe is not None:
+            # L2 normalize queries and keys: ||Q|| = ||K|| = 1
+            # This controls variance of φ(Q)φ(K)^T approximation
+            q = q / torch.norm(q, p=2, dim=-1, keepdim=True)
+            k = k / torch.norm(k, p=2, dim=-1, keepdim=True)
+        else:
+            # Standard ReLU scaling (d^(-1/4) for both Q and K)
+            q = q * self.relu_scale
+            k = k * self.relu_scale
 
         # Compute ReLU random features (key difference from FAVOR+)
         q_prime = self._compute_relu_features(q, self.omega)  # (B, heads, N, num_features)
         k_prime = self._compute_relu_features(k, self.omega)  # (B, heads, N, num_features)
 
-        # Linear attention computation: O(N) complexity
-        # Step 1: Compute K'^T @ V
-        # (B, heads, num_features, N) @ (B, heads, N, head_dim) -> (B, heads, num_features, head_dim)
-        kv = torch.einsum('bhnf,bhnd->bhfd', k_prime, v)
+        # Branching based on whether RPE is used
+        if rpe is not None:
+            # KERPLE attention with FFT-based RPE: O(n log n) complexity
+            # From Algorithm 1 in Luo et al., 2021
 
-        # Step 2: Compute Q' @ (K'^T @ V)
-        # (B, heads, N, num_features) @ (B, heads, num_features, head_dim) -> (B, heads, N, head_dim)
-        out_numerator = torch.einsum('bhnf,bhfd->bhnd', q_prime, kv)
+            # Step 1: Compute D1 = C @ (K'^T @ V) using FFT
+            # where C is Toeplitz matrix with C[i,j] = exp(b_{j-i})
+            D1 = rpe.apply_rpe_fft(k_prime, v)  # (B, heads, n, num_features, head_dim)
 
-        # Step 3: Compute normalization denominator
-        # Sum of k_prime over sequence dimension
-        k_prime_sum = k_prime.sum(dim=2)  # (B, heads, num_features)
-        # Q' @ sum(K')
-        out_denominator = torch.einsum('bhnf,bhf->bhn', q_prime, k_prime_sum)
+            # Step 2: Compute D2 = C @ K'^T using FFT
+            D2 = rpe.apply_rpe_fft(k_prime, None)  # (B, heads, n, num_features)
+
+            # Step 3: Compute attention output
+            # For each position i: z_i = (Q'_i @ D1_i) / (Q'_i @ D2_i)
+
+            # Numerator: φ(Q_i) @ D1[i]
+            # q_prime: [B, heads, n, num_features]
+            # D1: [B, heads, n, num_features, head_dim]
+            # We want: for each position i, q_prime[i] @ D1[i]
+            out_numerator = torch.einsum('bhnf,bhnfd->bhnd', q_prime, D1)
+            # out_numerator: [B, heads, n, head_dim]
+
+            # Denominator: φ(Q_i) @ D2[i]
+            # D2: [B, heads, n, num_features]
+            out_denominator = torch.einsum('bhnf,bhnf->bhn', q_prime, D2)
+            # out_denominator: [B, heads, n]
+
+        else:
+            # Standard kernelized attention (no RPE): O(N) complexity
+            # Step 1: Compute K'^T @ V
+            kv = torch.einsum('bhnf,bhnd->bhfd', k_prime, v)
+
+            # Step 2: Compute Q' @ (K'^T @ V)
+            out_numerator = torch.einsum('bhnf,bhfd->bhnd', q_prime, kv)
+
+            # Step 3: Compute normalization denominator
+            k_prime_sum = k_prime.sum(dim=2)  # (B, heads, num_features)
+            out_denominator = torch.einsum('bhnf,bhf->bhn', q_prime, k_prime_sum)
 
         # Step 4: Normalize (add small epsilon for stability)
         out = out_numerator / (out_denominator.unsqueeze(-1) + 1e-6)

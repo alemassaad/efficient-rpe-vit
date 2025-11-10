@@ -74,14 +74,13 @@ class UnifiedTransformerBlock(nn.Module):
         # Pre-norm attention with residual
         normed = self.norm1(x)
 
-        # Apply attention (and optionally RPE)
+        # Apply attention with RPE integrated inside
+        # CRITICAL: RPE must be passed INTO attention, not applied after!
+        # For KERPLE, this allows O(n log n) FFT-based computation
         if self.rpe is not None:
-            # RPE modules will modify attention computation
-            # The exact interface will be defined when implementing RPEs
-            attn_output = self.attention(normed)
-            attn_output = self.rpe(attn_output, normed)
+            attn_output = self.attention(normed, rpe=self.rpe)
         else:
-            attn_output = self.attention(normed)
+            attn_output = self.attention(normed, rpe=None)
 
         x = x + attn_output
 
