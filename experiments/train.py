@@ -32,6 +32,7 @@ from experiments.utils import (
     save_checkpoint,
     load_checkpoint
 )
+from experiments.utils.benchmark_utils import compute_convergence_metrics
 
 
 def parse_args():
@@ -248,6 +249,10 @@ def main():
     test_losses = []
     test_accs = []
     best_test_acc = 0
+    best_test_epoch = 0
+
+    # Track per-epoch metrics for benchmark
+    per_epoch_history = []
 
     global_start_time = time.time()
 
@@ -295,6 +300,7 @@ def main():
         # Track best model accuracy
         if test_metrics['accuracy'] > best_test_acc:
             best_test_acc = test_metrics['accuracy']
+            best_test_epoch = epoch
 
             # Save checkpoint if requested
             if args.save_model:
@@ -303,6 +309,18 @@ def main():
                     model, optimizer, epoch, test_metrics,
                     str(checkpoint_path), args.model
                 )
+
+        # Save per-epoch metrics for benchmark
+        per_epoch_history.append({
+            'epoch': epoch,
+            'train_loss': train_metrics['loss'],
+            'train_accuracy': train_metrics['accuracy'],
+            'train_time_sec': train_metrics['time'],
+            'test_loss': test_metrics['loss'],
+            'test_accuracy': test_metrics['accuracy'],
+            'test_time_sec': 0.0,  # evaluate() doesn't return time yet
+            'peak_memory_mb': train_metrics.get('peak_memory_mb', 0.0)
+        })
 
     # Final evaluation
     print(f"\n{'='*60}")
@@ -323,23 +341,57 @@ def main():
 
     # Save metrics
     if args.save_metrics:
+        # Compute convergence metrics
+        convergence = compute_convergence_metrics(per_epoch_history)
+
+        # Compute aggregate time statistics
+        if per_epoch_history:
+            avg_train_time = np.mean([e['train_time_sec'] for e in per_epoch_history])
+            avg_test_time = np.mean([e['test_time_sec'] for e in per_epoch_history])
+            total_train_time = sum([e['train_time_sec'] for e in per_epoch_history])
+            total_test_time = sum([e['test_time_sec'] for e in per_epoch_history])
+            final_train_acc = per_epoch_history[-1]['train_accuracy']
+            final_test_acc = per_epoch_history[-1]['test_accuracy']
+        else:
+            avg_train_time = 0.0
+            avg_test_time = 0.0
+            total_train_time = 0.0
+            total_test_time = 0.0
+            final_train_acc = 0.0
+            final_test_acc = 0.0
+
         metrics = {
-            'model': args.model,
-            'attention_type': model_info['attention_type'],
-            'rpe_type': model_info['rpe_type'],
-            'dataset': args.dataset,
-            'config': config,
-            'parameters': param_counts,
-            'training': {
-                'train_losses': train_losses,
-                'train_accuracies': train_accs,
-                'test_losses': test_losses,
-                'test_accuracies': test_accs,
-                'best_test_accuracy': best_test_acc,
-                'total_time': time.time() - global_start_time
+            'metadata': {
+                'model': args.model,
+                'attention_type': model_info['attention_type'],
+                'rpe_type': model_info['rpe_type'],
+                'dataset': args.dataset,
+                'seed': args.seed,
+                'epochs': config['epochs'],
+                'batch_size': config['batch_size'],
+                'learning_rate': config['learning_rate'],
+                'optimizer': args.optimizer,
+                'scheduler': args.scheduler,
+                'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S')
             },
-            'inference': benchmark_metrics,
-            'args': vars(args)
+            'per_epoch': per_epoch_history,
+            'aggregate': {
+                'best_test_accuracy': best_test_acc,
+                'best_test_epoch': best_test_epoch,
+                'final_test_accuracy': final_test_acc,
+                'final_train_accuracy': final_train_acc,
+                'avg_train_time_per_epoch': avg_train_time,
+                'avg_test_time_per_epoch': avg_test_time,
+                'total_training_time': total_train_time,
+                'total_testing_time': total_test_time,
+                'epochs_to_90_percent': convergence['epochs_to_90_percent'],
+                'epochs_to_95_percent': convergence['epochs_to_95_percent'],
+                'epochs_to_99_percent': convergence['epochs_to_99_percent'],
+                'epochs_until_plateau': convergence['epochs_until_plateau'],
+                'total_parameters': param_counts['total'],
+                'trainable_parameters': param_counts['trainable']
+            },
+            'inference': benchmark_metrics
         }
 
         metrics_path = output_dir / f"{args.model}_{args.dataset}_metrics.json"

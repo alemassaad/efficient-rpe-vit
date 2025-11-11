@@ -147,6 +147,152 @@ python test_kerple.py
 python -m unittest test_kerple.TestKERPLEIntegration::test_favor_plus_with_kerple -v
 ```
 
+## 📊 Benchmarking & Visualization
+
+### Running Benchmarks
+
+Benchmark multiple models across multiple random seeds for statistical rigor:
+
+```bash
+# Basic benchmark: Compare 3 models with 5 runs each
+python experiments/benchmark.py \
+    --models baseline performer_favor performer_favor_most_general \
+    --dataset mnist \
+    --num-runs 5 \
+    --epochs 20 \
+    --batch-size 64
+
+# Quick test benchmark (faster iteration)
+python experiments/benchmark.py \
+    --models baseline performer_favor \
+    --dataset mnist \
+    --num-runs 2 \
+    --epochs 5 \
+    --batch-size 256
+
+# Full CIFAR-10 benchmark (research-grade)
+python experiments/benchmark.py \
+    --models baseline performer_favor performer_relu \
+              performer_favor_most_general performer_relu_most_general \
+    --dataset cifar10 \
+    --num-runs 5 \
+    --epochs 50 \
+    --batch-size 64
+```
+
+**Benchmark Output Structure:**
+```
+results/
+└── benchmark_mnist_20251111_113441/
+    ├── benchmark_config.json          # Benchmark configuration
+    ├── baseline/
+    │   ├── aggregated_stats.json      # Statistics across all runs
+    │   ├── run_0/                     # Individual run results
+    │   │   └── baseline_metrics.json
+    │   ├── run_1/
+    │   └── ...
+    └── performer_favor/
+        └── ...
+```
+
+**What Gets Measured:**
+- **Accuracy**: Best, final, per-epoch test accuracy
+- **Training Time**: Seconds per epoch, total training time
+- **Inference Speed**: Mean latency in milliseconds
+- **Convergence**: Epochs to reach 90%, 95%, 99% accuracy
+- **Statistics**: Mean, std, min, max, percentiles across runs
+
+### Interactive Dashboard
+
+Visualize benchmark results with an interactive Streamlit dashboard:
+
+**Step 1: Install Dashboard Dependencies**
+```bash
+pip install streamlit plotly
+```
+
+**Step 2: Launch Dashboard**
+```bash
+streamlit run experiments/dashboard.py
+```
+
+This will:
+- Start a local web server
+- Automatically open your browser to http://localhost:8501
+
+**Step 3: Load Your Results**
+
+In the sidebar, enter the path to your benchmark results:
+```
+results/benchmark_mnist_20251111_113441
+```
+
+**Step 4: Explore Visualizations**
+
+The dashboard provides six interactive tabs:
+
+1. **📊 Overview**
+   - Summary statistics table for all models
+   - Key metrics: Best accuracy, training time, inference speed
+   - Quick comparison of top performers
+
+2. **📈 Accuracy**
+   - Percentile-based accuracy distributions
+   - Solid lines: Mean accuracy
+   - Dashed lines: 5th, 25th, 75th, 95th percentiles
+   - Shaded bands: 5-95% (light) and 25-75% (darker) ranges
+   - Scatter points: Individual run values
+
+3. **⏱️ Training Dynamics**
+   - Per-epoch training curves
+   - Mean accuracy/loss over time
+   - Percentile confidence bands (5-95% and 25-75%)
+   - Compare convergence speed across models
+
+4. **⚡ Efficiency**
+   - Training time and inference latency comparison
+   - Accuracy vs efficiency scatter plot
+   - Identify Pareto-optimal models
+
+5. **🎯 Convergence**
+   - Epochs to reach 90%, 95%, 99% accuracy
+   - Compare learning speed across architectures
+
+6. **🔍 Per-Run Details**
+   - Drill down into individual runs
+   - View complete training history
+   - Inspect full metrics JSON
+
+**Dashboard Features:**
+- ✅ **Interactive**: Hover for exact values, zoom, pan
+- ✅ **Publication-ready**: Export plots with built-in camera icon
+- ✅ **Real-time**: Instantly updates when you change results path
+- ✅ **Statistical rigor**: Percentile-based visualizations
+- ✅ **Comprehensive**: All metrics in one place
+
+### Example Workflow
+
+Complete benchmark-to-publication workflow:
+
+```bash
+# 1. Run comprehensive benchmark
+python experiments/benchmark.py \
+    --models baseline performer_favor performer_favor_most_general \
+    --dataset mnist \
+    --num-runs 5 \
+    --epochs 20 \
+    --batch-size 64
+
+# 2. Note the output directory (e.g., results/benchmark_mnist_20251111_113441)
+
+# 3. Launch dashboard
+streamlit run experiments/dashboard.py
+
+# 4. Enter the path in the dashboard sidebar
+
+# 5. Explore results, export plots for your paper!
+```
+
 ### Deactivating the Environment
 ```bash
 # When done working
