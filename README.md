@@ -24,7 +24,7 @@ See [`docs/KERPLE_DOCUMENTATION.md`](docs/KERPLE_DOCUMENTATION.md) for full tech
 - 📊 **Circulant-STRING competitive**: 94.07% vs 94.20% accuracy, similar performance to baseline
 - ⚡ **Speed trade-offs**: RoPE ~57% slower inference, Circulant-STRING ~22% slower (expected for RPE overhead)
 
-See [`results/initial_tests/rope_circulant_comparison.md`](results/initial_tests/rope_circulant_comparison.md) for detailed results.
+See [`docs/results/rope_circulant_comparison.md`](docs/results/rope_circulant_comparison.md) for detailed results.
 
 ## Project Objective
 
