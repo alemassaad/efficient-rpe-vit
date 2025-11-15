@@ -55,7 +55,7 @@ class SoftmaxAttention(BaseAttention):
         Args:
             x: Input tensor of shape (batch, seq_len, dim)
             mask: Optional attention mask of shape (batch, seq_len, seq_len)
-            rpe: Optional RPE module (KERPLE not supported for softmax)
+            rpe: Optional RPE module (RoPE or Circulant-STRING supported)
             return_attention: If True, also return attention weights
 
         Returns:
@@ -65,7 +65,7 @@ class SoftmaxAttention(BaseAttention):
         Raises:
             NotImplementedError: If KERPLE RPE is provided (incompatible with softmax)
         """
-        # Check if KERPLE RPE is being used
+        # Check if KERPLE RPE is being used (not compatible with softmax)
         if rpe is not None:
             from ..rpe import KERPLEPositionalEncoding
             if isinstance(rpe, KERPLEPositionalEncoding):
@@ -73,14 +73,8 @@ class SoftmaxAttention(BaseAttention):
                     "KERPLE RPE is designed specifically for kernelized attention "
                     "(FAVOR+/ReLU Performer) and cannot be used with standard softmax attention. "
                     "KERPLE requires linear attention mechanisms to achieve O(n log n) complexity. "
-                    "For softmax attention, consider using other RPE types like Shaw et al. 2018."
+                    "For softmax attention, use RoPE or Circulant-STRING RPE instead."
                 )
-            # For future RPE types compatible with softmax, we could handle them here
-            # For now, reject any RPE
-            raise NotImplementedError(
-                "RPE integration with softmax attention is not yet implemented. "
-                "Currently only KERPLE is implemented, which requires kernelized attention."
-            )
 
         B, N, C = x.shape
 
@@ -89,8 +83,20 @@ class SoftmaxAttention(BaseAttention):
         qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, heads, N, head_dim)
         q, k, v = qkv[0], qkv[1], qkv[2]  # Each: (B, heads, N, head_dim)
 
+        # Apply RoPE if provided (modifies Q and K before attention computation)
+        if rpe is not None:
+            from ..rpe import RoPE
+            if isinstance(rpe, RoPE):
+                q, k = rpe.apply_rotary_emb(q, k)
+
         # Compute attention scores: Q @ K^T / sqrt(d)
         attn = (q @ k.transpose(-2, -1)) * self.scale  # (B, heads, N, N)
+
+        # Apply Circulant-STRING RPE if provided (adds bias to attention scores)
+        if rpe is not None:
+            from ..rpe import CirculantStringRPE
+            if isinstance(rpe, CirculantStringRPE):
+                attn = rpe.apply_bias(attn, seq_len=N)
 
         # Apply mask if provided
         if mask is not None:

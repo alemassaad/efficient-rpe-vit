@@ -1,7 +1,8 @@
 # Efficient-RPE-ViT: Improving Performer Vision Transformers with Relative Positional Encodings
 
-## ✅ KERPLE Integration Complete!
+## ✅ Recent Updates
 
+### KERPLE Integration Complete!
 **KERPLE (Kernelized Attention with RPE)** is now fully implemented and working! Models `performer_favor_most_general` and `performer_relu_most_general` train successfully with:
 - ✅ Vectorized O(n log n) FFT operations
 - ✅ All 23 unit tests passing
@@ -10,9 +11,17 @@
 
 See [`docs/KERPLE_DOCUMENTATION.md`](docs/KERPLE_DOCUMENTATION.md) for full technical documentation.
 
+### Brute-Force Softmax Attention with RPE Complete!
+**RoPE and Circulant-STRING RPE** are now fully implemented for brute-force softmax attention! Models `baseline_rope` and `baseline_circulant` are ready for training:
+- ✅ **RoPE (Rotary Position Embedding)**: Applies rotations to Q/K embeddings before attention computation
+- ✅ **Circulant-STRING RPE**: Adds learnable relative position biases to attention scores
+- ✅ Both support 2D position encoding for vision transformers
+- ✅ Maintains O(N²) complexity as expected for softmax attention
+- ✅ Full integration with existing model factory and training pipeline
+
 ## Project Objective
 
-This project investigates the downstream accuracy improvement of Vision Transformers (ViTs) utilizing Performer architectures through integration with various Relative Positional Encoding (RPE) methods. The study examines small ViT models with Performer backbones for attention computation, considering two Performer variants: (a) models leveraging positive random features for unbiased approximation of the softmax kernel (FAVOR+), and (b) Performer-ReLU architectures. The Performer-ViT models are enriched with three RPE mechanisms: (1) **KERPLE - kernelized attention with relative positional encoding [Luo et al., 2021] ✅ COMPLETE**, (2) circulant-STRING [Schenck et al., 2025], and (3) rotary position embedding (RoPE) [Su et al., 2024]. Efficient implementations of these RPE-enriched Performers are provided and compared against standard brute-force attention ViT. The central research question examines whether RPE integration can effectively close the accuracy gap between standard ViT and Performer variants. Experimental validation is conducted on MNIST and CIFAR-10 datasets, with comprehensive comparison of training time, inference time, and classification accuracy across all model variants.
+This project investigates the downstream accuracy improvement of Vision Transformers (ViTs) utilizing Performer architectures through integration with various Relative Positional Encoding (RPE) methods. The study examines small ViT models with Performer backbones for attention computation, considering two Performer variants: (a) models leveraging positive random features for unbiased approximation of the softmax kernel (FAVOR+), and (b) Performer-ReLU architectures. The Performer-ViT models are enriched with three RPE mechanisms: (1) **KERPLE - kernelized attention with relative positional encoding [Luo et al., 2021] ✅ COMPLETE**, (2) **Circulant-STRING [Schenck et al., 2025] ✅ COMPLETE (for softmax attention)**, and (3) **Rotary position embedding (RoPE) [Su et al., 2024] ✅ COMPLETE (for softmax attention)**. Efficient implementations of these RPE-enriched Performers are provided and compared against standard brute-force attention ViT. The central research question examines whether RPE integration can effectively close the accuracy gap between standard ViT and Performer variants. Experimental validation is conducted on MNIST and CIFAR-10 datasets, with comprehensive comparison of training time, inference time, and classification accuracy across all model variants.
 
 ## Core Technical Challenge
 
@@ -26,8 +35,8 @@ The experimental framework encompasses twelve model variants combining three att
 | :--- | :--- | :--- | :--- | :--- |
 | **Baseline (Quadratic)** | Brute-Force Softmax Attention | None (Absolute PE) | $\mathcal{O}(N^2)$ | ✅ Working |
 | | Brute-Force Softmax Attention | KERPLE [Luo et al., 2021] | N/A | ❌ Incompatible* |
-| | Brute-Force Softmax Attention | Circulant-STRING [Schenck et al., 2025] | $\mathcal{O}(N^2)$ | ⏳ TODO |
-| | Brute-Force Softmax Attention | RoPE [Su et al., 2024] | $\mathcal{O}(N^2)$ | ⏳ TODO |
+| | Brute-Force Softmax Attention | **Circulant-STRING [Schenck et al., 2025]** | $\mathcal{O}(N^2)$ | **✅ Complete!** |
+| | Brute-Force Softmax Attention | **RoPE [Su et al., 2024]** | $\mathcal{O}(N^2)$ | **✅ Complete!** |
 | **Performer-FAVOR+** | Positive Random Features | None (Absolute PE) | $\mathcal{O}(N)$ | ✅ Working |
 | | Positive Random Features | **KERPLE [Luo et al., 2021]** | $\mathcal{O}(N \log N)$ | **✅ Complete!** |
 | | Positive Random Features | Circulant-STRING [Schenck et al., 2025] | $\mathcal{O}(N)$ | ⏳ TODO |
@@ -133,6 +142,16 @@ python experiments/train.py --model performer_favor_most_general \
 python experiments/train.py --model performer_relu_most_general \
     --dataset mnist \
     --epochs 10
+
+# ✨ NEW: Train baseline ViT with RoPE
+python experiments/train.py --model baseline_rope \
+    --dataset mnist \
+    --epochs 10
+
+# ✨ NEW: Train baseline ViT with Circulant-STRING RPE
+python experiments/train.py --model baseline_circulant \
+    --dataset mnist \
+    --epochs 10
 ```
 
 ### Running Tests
@@ -154,9 +173,10 @@ python -m unittest test_kerple.TestKERPLEIntegration::test_favor_plus_with_kerpl
 Benchmark multiple models across multiple random seeds for statistical rigor:
 
 ```bash
-# Basic benchmark: Compare 3 models with 5 runs each
+# Basic benchmark: Compare models with 5 runs each
 python experiments/benchmark.py \
     --models baseline performer_favor performer_favor_most_general \
+              baseline_rope baseline_circulant \
     --dataset mnist \
     --num-runs 5 \
     --epochs 20 \
@@ -278,6 +298,7 @@ Complete benchmark-to-publication workflow:
 # 1. Run comprehensive benchmark
 python experiments/benchmark.py \
     --models baseline performer_favor performer_favor_most_general \
+              baseline_rope baseline_circulant \
     --dataset mnist \
     --num-runs 5 \
     --epochs 20 \

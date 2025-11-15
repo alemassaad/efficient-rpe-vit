@@ -77,7 +77,9 @@ def create_attention_builder(
 
 def create_rpe_builder(
     rpe_type: Optional[str],
-    rpe_config: Optional[Dict[str, Any]] = None
+    rpe_config: Optional[Dict[str, Any]] = None,
+    image_size: Optional[int] = None,
+    patch_size: Optional[int] = None
 ) -> Optional[Callable]:
     """
     Create a builder function for RPE modules.
@@ -85,6 +87,8 @@ def create_rpe_builder(
     Args:
         rpe_type: Type of RPE mechanism (or None)
         rpe_config: Additional configuration for RPE
+        image_size: Image size (for 2D RPE like Circulant-STRING)
+        patch_size: Patch size (for 2D RPE like Circulant-STRING)
 
     Returns:
         Function that creates RPE modules, or None if no RPE
@@ -100,6 +104,12 @@ def create_rpe_builder(
 
     rpe_class = RPE_REGISTRY[rpe_type]
     config = rpe_config or {}
+    
+    # For Circulant-STRING, add image_size and patch_size if available
+    if rpe_type in ['circulant_string', 'circulant'] and image_size is not None and patch_size is not None:
+        config = config.copy()
+        config['image_size'] = image_size
+        config['patch_size'] = patch_size
 
     def builder(num_patches: int, dim: int, heads: int) -> nn.Module:
         """Build RPE module with specified dimensions."""
@@ -195,7 +205,12 @@ def create_model(
 
     # Create builder functions
     attention_builder = create_attention_builder(attention_type, attention_config)
-    rpe_builder = create_rpe_builder(rpe_type, rpe_config)
+    rpe_builder = create_rpe_builder(
+        rpe_type, 
+        rpe_config,
+        image_size=config.get('image_size'),
+        patch_size=config.get('patch_size')
+    )
 
     # Extract only the parameters that BaseViT expects
     vit_params = {
