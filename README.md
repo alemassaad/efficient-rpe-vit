@@ -19,6 +19,13 @@ See [`docs/KERPLE_DOCUMENTATION.md`](docs/KERPLE_DOCUMENTATION.md) for full tech
 - ✅ Maintains O(N²) complexity as expected for softmax attention
 - ✅ Full integration with existing model factory and training pipeline
 
+**Initial Performance Results (3 epochs on MNIST):**
+- 🎯 **RoPE outperforms baseline**: 95.08% vs 94.20% accuracy (+0.88%), with 17% lower test loss
+- 📊 **Circulant-STRING competitive**: 94.07% vs 94.20% accuracy, similar performance to baseline
+- ⚡ **Speed trade-offs**: RoPE ~57% slower inference, Circulant-STRING ~22% slower (expected for RPE overhead)
+
+See [`results/initial_tests/rope_circulant_comparison.md`](results/initial_tests/rope_circulant_comparison.md) for detailed results.
+
 ## Project Objective
 
 This project investigates the downstream accuracy improvement of Vision Transformers (ViTs) utilizing Performer architectures through integration with various Relative Positional Encoding (RPE) methods. The study examines small ViT models with Performer backbones for attention computation, considering two Performer variants: (a) models leveraging positive random features for unbiased approximation of the softmax kernel (FAVOR+), and (b) Performer-ReLU architectures. The Performer-ViT models are enriched with three RPE mechanisms: (1) **KERPLE - kernelized attention with relative positional encoding [Luo et al., 2021] ✅ COMPLETE**, (2) **Circulant-STRING [Schenck et al., 2025] ✅ COMPLETE (for softmax attention)**, and (3) **Rotary position embedding (RoPE) [Su et al., 2024] ✅ COMPLETE (for softmax attention)**. Efficient implementations of these RPE-enriched Performers are provided and compared against standard brute-force attention ViT. The central research question examines whether RPE integration can effectively close the accuracy gap between standard ViT and Performer variants. Experimental validation is conducted on MNIST and CIFAR-10 datasets, with comprehensive comparison of training time, inference time, and classification accuracy across all model variants.
