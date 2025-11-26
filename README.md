@@ -1,28 +1,35 @@
 # Efficient-RPE-ViT: Improving Performer Vision Transformers with Relative Positional Encodings
 
-## ✅ Recent Updates
+## ✅ Implementation Status
 
-### KERPLE Integration Complete!
-**KERPLE (Kernelized Attention with RPE)** is now fully implemented and working! Models `performer_favor_most_general` and `performer_relu_most_general` train successfully with:
-- ✅ Vectorized O(n log n) FFT operations
-- ✅ All 23 unit tests passing
-- ✅ Successful training on MNIST (63.57% accuracy after 1 epoch)
-- ✅ No divergence, stable gradients
+### Fully Implemented Models (7 of 12)
 
-See [`docs/KERPLE_DOCUMENTATION.md`](docs/KERPLE_DOCUMENTATION.md) for full technical documentation.
+| Model | Attention | RPE | Status |
+|-------|-----------|-----|--------|
+| `baseline` | Softmax O(N²) | None | ✅ Complete |
+| `baseline_rope` | Softmax O(N²) | RoPE | ✅ Complete |
+| `baseline_circulant` | Softmax O(N²) | Circulant-STRING | ✅ Complete |
+| `performer_favor` | FAVOR+ O(N) | None | ✅ Complete |
+| `performer_favor_most_general` | FAVOR+ O(N) | KERPLE | ✅ Complete |
+| `performer_relu` | ReLU O(N) | None | ✅ Complete |
+| `performer_relu_most_general` | ReLU O(N) | KERPLE | ✅ Complete |
 
-### Brute-Force Softmax Attention with RPE Complete!
-**RoPE and Circulant-STRING RPE** are now fully implemented for brute-force softmax attention! Models `baseline_rope` and `baseline_circulant` are ready for training:
-- ✅ **RoPE (Rotary Position Embedding)**: Applies rotations to Q/K embeddings before attention computation
-- ✅ **Circulant-STRING RPE**: Adds learnable relative position biases to attention scores
-- ✅ Both support 2D position encoding for vision transformers
-- ✅ Maintains O(N²) complexity as expected for softmax attention
-- ✅ Full integration with existing model factory and training pipeline
+### TODO: Performer + RoPE/Circulant-STRING (5 remaining)
+- `performer_favor_rope`, `performer_favor_circulant`
+- `performer_relu_rope`, `performer_relu_circulant`
+- `baseline_most_general` (KERPLE incompatible with softmax by design)
 
-**Initial Performance Results (3 epochs on MNIST):**
-- 🎯 **RoPE outperforms baseline**: 95.08% vs 94.20% accuracy (+0.88%), with 17% lower test loss
-- 📊 **Circulant-STRING competitive**: 94.07% vs 94.20% accuracy, similar performance to baseline
-- ⚡ **Speed trade-offs**: RoPE ~57% slower inference, Circulant-STRING ~22% slower (expected for RPE overhead)
+### Key Implementation Notes
+- **KERPLE**: FFT-accelerated O(n log n), fully vectorized, 23 unit tests passing. See [`docs/KERPLE_DOCUMENTATION.md`](docs/KERPLE_DOCUMENTATION.md)
+- **RoPE**: Rotations applied to Q/K before attention, supports 2D vision positions
+- **Circulant-STRING**: Learnable relative position biases added to attention scores
+
+### Initial Performance (3 epochs, MNIST)
+| Model | Accuracy | vs Baseline |
+|-------|----------|-------------|
+| baseline | 94.20% | — |
+| baseline_rope | 95.08% | +0.88% |
+| baseline_circulant | 94.07% | -0.13% |
 
 See [`docs/results/rope_circulant_comparison.md`](docs/results/rope_circulant_comparison.md) for detailed results.
 
@@ -36,24 +43,24 @@ The primary technical challenge involves implementing RPE mechanisms within the 
 
 ## Model Architectures
 
-The experimental framework encompasses twelve model variants combining three attention mechanisms with four positional encoding approaches.
+The framework supports 12 model variants combining 3 attention mechanisms with 4 positional encoding approaches. **7 are fully implemented**.
 
-| Category | Attention Mechanism | RPE Mechanism | Complexity | Status |
+| Category | Attention | RPE | Complexity | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Baseline (Quadratic)** | Brute-Force Softmax Attention | None (Absolute PE) | $\mathcal{O}(N^2)$ | ✅ Working |
-| | Brute-Force Softmax Attention | KERPLE [Luo et al., 2021] | N/A | ❌ Incompatible* |
-| | Brute-Force Softmax Attention | **Circulant-STRING [Schenck et al., 2025]** | $\mathcal{O}(N^2)$ | **✅ Complete!** |
-| | Brute-Force Softmax Attention | **RoPE [Su et al., 2024]** | $\mathcal{O}(N^2)$ | **✅ Complete!** |
-| **Performer-FAVOR+** | Positive Random Features | None (Absolute PE) | $\mathcal{O}(N)$ | ✅ Working |
-| | Positive Random Features | **KERPLE [Luo et al., 2021]** | $\mathcal{O}(N \log N)$ | **✅ Complete!** |
-| | Positive Random Features | Circulant-STRING [Schenck et al., 2025] | $\mathcal{O}(N)$ | ⏳ TODO |
-| | Positive Random Features | RoPE [Su et al., 2024] | $\mathcal{O}(N)$ | ⏳ TODO |
-| **Performer-ReLU** | ReLU Kernel Approximation | None (Absolute PE) | $\mathcal{O}(N)$ | ✅ Working |
-| | ReLU Kernel Approximation | **KERPLE [Luo et al., 2021]** | $\mathcal{O}(N \log N)$ | **✅ Complete!** |
-| | ReLU Kernel Approximation | Circulant-STRING [Schenck et al., 2025] | $\mathcal{O}(N)$ | ⏳ TODO |
-| | ReLU Kernel Approximation | RoPE [Su et al., 2024] | $\mathcal{O}(N)$ | ⏳ TODO |
+| **Baseline** | Softmax | None | $\mathcal{O}(N^2)$ | ✅ |
+| | Softmax | RoPE | $\mathcal{O}(N^2)$ | ✅ |
+| | Softmax | Circulant-STRING | $\mathcal{O}(N^2)$ | ✅ |
+| | Softmax | KERPLE | — | ❌ Incompatible* |
+| **FAVOR+** | Linear (FAVOR+) | None | $\mathcal{O}(N)$ | ✅ |
+| | Linear (FAVOR+) | KERPLE | $\mathcal{O}(N \log N)$ | ✅ |
+| | Linear (FAVOR+) | RoPE | $\mathcal{O}(N)$ | ⏳ TODO |
+| | Linear (FAVOR+) | Circulant-STRING | $\mathcal{O}(N)$ | ⏳ TODO |
+| **ReLU** | Linear (ReLU) | None | $\mathcal{O}(N)$ | ✅ |
+| | Linear (ReLU) | KERPLE | $\mathcal{O}(N \log N)$ | ✅ |
+| | Linear (ReLU) | RoPE | $\mathcal{O}(N)$ | ⏳ TODO |
+| | Linear (ReLU) | Circulant-STRING | $\mathcal{O}(N)$ | ⏳ TODO |
 
-\* KERPLE is designed specifically for linear attention and cannot work with quadratic softmax attention by design.
+\* KERPLE requires linear attention for its FFT-based O(n log n) approach.
 
 ## Experimental Design
 
