@@ -145,12 +145,16 @@ class ReLUAttention(BaseAttention):
         return_attention: bool = False
     ) -> torch.Tensor:
         """
-        Compute Performer-ReLU linear attention with optional KERPLE RPE.
+        Compute Performer-ReLU linear attention with optional RPE.
+
+        Supports two RPE mechanisms:
+        - RoPE: Applies rotations to Q/K before feature map, maintains O(N) complexity
+        - KERPLE: Uses FFT-based Toeplitz computation, O(N log N) complexity
 
         Args:
             x: Input tensor of shape (batch, seq_len, dim)
             mask: Optional attention mask (currently not supported for linear attention)
-            rpe: Optional KERPLE RPE module for O(n log n) relative positional encoding
+            rpe: Optional RPE module (RoPE or KERPLE)
             return_attention: Not applicable for linear attention (no explicit attention matrix)
 
         Returns:
@@ -169,14 +173,26 @@ class ReLUAttention(BaseAttention):
         qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, heads, N, head_dim)
         q, k, v = qkv[0], qkv[1], qkv[2]  # Each: (B, heads, N, head_dim)
 
-        # CRITICAL: Q/K normalization when using KERPLE RPE
-        # From Luo et al., 2021, Section 3.3 and Theorem 3:
-        # Normalization is REQUIRED for training stability with kernelized attention + RPE
+        # Handle different RPE types
         if rpe is not None:
-            # L2 normalize queries and keys: ||Q|| = ||K|| = 1
-            # This controls variance of φ(Q)φ(K)^T approximation
-            q = q / torch.norm(q, p=2, dim=-1, keepdim=True)
-            k = k / torch.norm(k, p=2, dim=-1, keepdim=True)
+            from ..rpe import RoPE, KERPLEPositionalEncoding
+
+            if isinstance(rpe, RoPE):
+                # RoPE: Apply rotations to Q/K BEFORE feature map
+                # RoPE encodes relative position via rotation, works with any attention
+                q, k = rpe.apply_rotary_emb(q, k)
+                # Then apply standard ReLU scaling
+                q = q * self.relu_scale
+                k = k * self.relu_scale
+            elif isinstance(rpe, KERPLEPositionalEncoding):
+                # KERPLE: Requires L2 normalization for training stability
+                # From Luo et al., 2021, Section 3.3 and Theorem 3
+                q = q / torch.norm(q, p=2, dim=-1, keepdim=True)
+                k = k / torch.norm(k, p=2, dim=-1, keepdim=True)
+            else:
+                # Unknown RPE type - use standard scaling
+                q = q * self.relu_scale
+                k = k * self.relu_scale
         else:
             # Standard ReLU scaling (d^(-1/4) for both Q and K)
             q = q * self.relu_scale
@@ -186,8 +202,13 @@ class ReLUAttention(BaseAttention):
         q_prime = self._compute_relu_features(q, self.omega)  # (B, heads, N, num_features)
         k_prime = self._compute_relu_features(k, self.omega)  # (B, heads, N, num_features)
 
-        # Branching based on whether RPE is used
-        if rpe is not None:
+        # Branching based on RPE type
+        # KERPLE requires special FFT-based computation
+        # RoPE already modified Q/K above, so uses standard path
+        from ..rpe import KERPLEPositionalEncoding
+        use_kerple = rpe is not None and isinstance(rpe, KERPLEPositionalEncoding)
+
+        if use_kerple:
             # KERPLE attention with FFT-based RPE: O(n log n) complexity
             # From Algorithm 1 in Luo et al., 2021
 

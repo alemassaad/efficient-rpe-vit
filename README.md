@@ -2,7 +2,7 @@
 
 ## ✅ Implementation Status
 
-### Fully Implemented Models (7 of 12)
+### Fully Implemented Models (9 of 12)
 
 | Model | Attention | RPE | Status |
 |-------|-----------|-----|--------|
@@ -11,12 +11,14 @@
 | `baseline_circulant` | Softmax O(N²) | Circulant-STRING | ✅ Complete |
 | `performer_favor` | FAVOR+ O(N) | None | ✅ Complete |
 | `performer_favor_most_general` | FAVOR+ O(N) | KERPLE | ✅ Complete |
+| `performer_favor_rope` | FAVOR+ O(N) | RoPE | ✅ Complete |
 | `performer_relu` | ReLU O(N) | None | ✅ Complete |
 | `performer_relu_most_general` | ReLU O(N) | KERPLE | ✅ Complete |
+| `performer_relu_rope` | ReLU O(N) | RoPE | ✅ Complete |
 
-### TODO: Performer + RoPE/Circulant-STRING (5 remaining)
-- `performer_favor_rope`, `performer_favor_circulant`
-- `performer_relu_rope`, `performer_relu_circulant`
+### TODO: Remaining Models (3 of 12)
+- `performer_favor_circulant` - FAVOR+ with Circulant-STRING
+- `performer_relu_circulant` - ReLU with Circulant-STRING
 - `baseline_most_general` (KERPLE incompatible with softmax by design)
 
 ### Key Implementation Notes
@@ -43,7 +45,7 @@ The primary technical challenge involves implementing RPE mechanisms within the 
 
 ## Model Architectures
 
-The framework supports 12 model variants combining 3 attention mechanisms with 4 positional encoding approaches. **7 are fully implemented**.
+The framework supports 12 model variants combining 3 attention mechanisms with 4 positional encoding approaches. **9 are fully implemented**.
 
 | Category | Attention | RPE | Complexity | Status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -53,11 +55,11 @@ The framework supports 12 model variants combining 3 attention mechanisms with 4
 | | Softmax | KERPLE | — | ❌ Incompatible* |
 | **FAVOR+** | Linear (FAVOR+) | None | $\mathcal{O}(N)$ | ✅ |
 | | Linear (FAVOR+) | KERPLE | $\mathcal{O}(N \log N)$ | ✅ |
-| | Linear (FAVOR+) | RoPE | $\mathcal{O}(N)$ | ⏳ TODO |
+| | Linear (FAVOR+) | RoPE | $\mathcal{O}(N)$ | ✅ |
 | | Linear (FAVOR+) | Circulant-STRING | $\mathcal{O}(N)$ | ⏳ TODO |
 | **ReLU** | Linear (ReLU) | None | $\mathcal{O}(N)$ | ✅ |
 | | Linear (ReLU) | KERPLE | $\mathcal{O}(N \log N)$ | ✅ |
-| | Linear (ReLU) | RoPE | $\mathcal{O}(N)$ | ⏳ TODO |
+| | Linear (ReLU) | RoPE | $\mathcal{O}(N)$ | ✅ |
 | | Linear (ReLU) | Circulant-STRING | $\mathcal{O}(N)$ | ⏳ TODO |
 
 \* KERPLE requires linear attention for its FFT-based O(n log n) approach.

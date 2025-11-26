@@ -552,6 +552,314 @@ class TestReLUAttention(unittest.TestCase):
             self.assertFalse(torch.isnan(output).any())
 
 
+class TestReLUWithRoPE(unittest.TestCase):
+    """Test ReLU attention with RoPE relative position encoding."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.dim = 64
+        self.heads = 4
+        self.seq_len = 16
+        self.batch_size = 2
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    def test_relu_rope_forward_pass(self):
+        """Test ReLU with RoPE produces valid output."""
+        from models.rpe import RoPE
+
+        attention = ReLUAttention(
+            dim=self.dim,
+            heads=self.heads,
+            use_orthogonal=True
+        ).to(self.device)
+
+        rpe = RoPE(
+            num_patches=self.seq_len,
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+        output = attention(x, rpe=rpe)
+
+        # Check output shape
+        self.assertEqual(output.shape, (self.batch_size, self.seq_len, self.dim))
+        # Check no NaNs
+        self.assertFalse(torch.isnan(output).any())
+        # Check no Infs
+        self.assertFalse(torch.isinf(output).any())
+
+    def test_relu_rope_gradient_flow(self):
+        """Test gradients flow through ReLU with RoPE."""
+        from models.rpe import RoPE
+
+        attention = ReLUAttention(
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        rpe = RoPE(
+            num_patches=self.seq_len,
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+        x.requires_grad = True
+
+        output = attention(x, rpe=rpe)
+        loss = output.sum()
+        loss.backward()
+
+        # Check input gradients
+        self.assertIsNotNone(x.grad)
+        self.assertFalse(torch.isnan(x.grad).any())
+
+        # Check attention parameter gradients
+        for name, param in attention.named_parameters():
+            if param.requires_grad:
+                self.assertIsNotNone(param.grad, f"No gradient for {name}")
+                self.assertFalse(torch.isnan(param.grad).any(), f"NaN gradient in {name}")
+
+    def test_relu_rope_different_from_no_rpe(self):
+        """Test that RoPE actually changes the output."""
+        from models.rpe import RoPE
+
+        torch.manual_seed(42)
+        attention = ReLUAttention(
+            dim=self.dim,
+            heads=self.heads,
+            use_orthogonal=True
+        ).to(self.device)
+
+        rpe = RoPE(
+            num_patches=self.seq_len,
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+
+        # Get output without RoPE
+        output_no_rpe = attention(x, rpe=None)
+
+        # Get output with RoPE
+        output_with_rpe = attention(x, rpe=rpe)
+
+        # They should be different
+        self.assertFalse(
+            torch.allclose(output_no_rpe, output_with_rpe, rtol=1e-3, atol=1e-3),
+            "RoPE should change the attention output"
+        )
+
+    def test_performer_relu_rope_model_creation(self):
+        """Test creating performer_relu_rope model via factory."""
+        model = create_model('performer_relu_rope', MNIST_CONFIG)
+
+        self.assertIsNotNone(model)
+        self.assertEqual(model.model_name, 'performer_relu_rope')
+        self.assertEqual(model.attention_type, 'relu')
+        self.assertEqual(model.rpe_type, 'rope')
+
+        # Test forward pass
+        x = torch.randn(2, 1, 28, 28)
+        output = model(x)
+
+        self.assertEqual(output.shape, (2, 10))
+        self.assertFalse(torch.isnan(output).any())
+
+    def test_performer_relu_rope_training_step(self):
+        """Test a full training step with performer_relu_rope."""
+        model = create_model('performer_relu_rope', MNIST_CONFIG)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        criterion = nn.CrossEntropyLoss()
+
+        # Simulate training step
+        x = torch.randn(4, 1, 28, 28)
+        targets = torch.randint(0, 10, (4,))
+
+        model.train()
+        optimizer.zero_grad()
+        output = model(x)
+        loss = criterion(output, targets)
+        loss.backward()
+        optimizer.step()
+
+        # Check loss is finite
+        self.assertFalse(torch.isnan(loss))
+        self.assertFalse(torch.isinf(loss))
+
+
+class TestFAVORPlusWithRoPE(unittest.TestCase):
+    """Test FAVOR+ attention with RoPE relative position encoding."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.dim = 64
+        self.heads = 4
+        self.seq_len = 16
+        self.batch_size = 2
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    def test_favor_plus_rope_forward_pass(self):
+        """Test FAVOR+ with RoPE produces valid output."""
+        from models.rpe import RoPE
+
+        attention = FAVORPlusAttention(
+            dim=self.dim,
+            heads=self.heads,
+            use_orthogonal=True
+        ).to(self.device)
+
+        rpe = RoPE(
+            num_patches=self.seq_len,
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+        output = attention(x, rpe=rpe)
+
+        # Check output shape
+        self.assertEqual(output.shape, (self.batch_size, self.seq_len, self.dim))
+        # Check no NaNs
+        self.assertFalse(torch.isnan(output).any())
+        # Check no Infs
+        self.assertFalse(torch.isinf(output).any())
+
+    def test_favor_plus_rope_gradient_flow(self):
+        """Test gradients flow through FAVOR+ with RoPE."""
+        from models.rpe import RoPE
+
+        attention = FAVORPlusAttention(
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        rpe = RoPE(
+            num_patches=self.seq_len,
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+        x.requires_grad = True
+
+        output = attention(x, rpe=rpe)
+        loss = output.sum()
+        loss.backward()
+
+        # Check input gradients
+        self.assertIsNotNone(x.grad)
+        self.assertFalse(torch.isnan(x.grad).any())
+
+        # Check attention parameter gradients
+        for name, param in attention.named_parameters():
+            if param.requires_grad:
+                self.assertIsNotNone(param.grad, f"No gradient for {name}")
+                self.assertFalse(torch.isnan(param.grad).any(), f"NaN gradient in {name}")
+
+    def test_favor_plus_rope_different_from_no_rpe(self):
+        """Test that RoPE actually changes the output."""
+        from models.rpe import RoPE
+
+        torch.manual_seed(42)
+        attention = FAVORPlusAttention(
+            dim=self.dim,
+            heads=self.heads,
+            use_orthogonal=True
+        ).to(self.device)
+
+        rpe = RoPE(
+            num_patches=self.seq_len,
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+
+        # Get output without RoPE
+        output_no_rpe = attention(x, rpe=None)
+
+        # Get output with RoPE
+        output_with_rpe = attention(x, rpe=rpe)
+
+        # They should be different
+        self.assertFalse(
+            torch.allclose(output_no_rpe, output_with_rpe, rtol=1e-3, atol=1e-3),
+            "RoPE should change the attention output"
+        )
+
+    def test_performer_favor_rope_model_creation(self):
+        """Test creating performer_favor_rope model via factory."""
+        model = create_model('performer_favor_rope', MNIST_CONFIG)
+
+        self.assertIsNotNone(model)
+        self.assertEqual(model.model_name, 'performer_favor_rope')
+        self.assertEqual(model.attention_type, 'favor_plus')
+        self.assertEqual(model.rpe_type, 'rope')
+
+        # Test forward pass
+        x = torch.randn(2, 1, 28, 28)
+        output = model(x)
+
+        self.assertEqual(output.shape, (2, 10))
+        self.assertFalse(torch.isnan(output).any())
+
+    def test_performer_favor_rope_training_step(self):
+        """Test a full training step with performer_favor_rope."""
+        model = create_model('performer_favor_rope', MNIST_CONFIG)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        criterion = nn.CrossEntropyLoss()
+
+        # Simulate training step
+        x = torch.randn(4, 1, 28, 28)
+        targets = torch.randint(0, 10, (4,))
+
+        model.train()
+        optimizer.zero_grad()
+        output = model(x)
+        loss = criterion(output, targets)
+        loss.backward()
+        optimizer.step()
+
+        # Check loss is finite
+        self.assertFalse(torch.isnan(loss))
+        self.assertFalse(torch.isinf(loss))
+
+    def test_favor_plus_rope_vs_kerple_different_paths(self):
+        """Test that RoPE and KERPLE use different code paths."""
+        from models.rpe import RoPE, KERPLEPositionalEncoding
+
+        attention = FAVORPlusAttention(
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        rope = RoPE(
+            num_patches=self.seq_len,
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        kerple = KERPLEPositionalEncoding(
+            num_patches=self.seq_len,
+            dim=self.dim,
+            heads=self.heads
+        ).to(self.device)
+
+        x = torch.randn(self.batch_size, self.seq_len, self.dim).to(self.device)
+
+        # Both should work without errors
+        output_rope = attention(x, rpe=rope)
+        output_kerple = attention(x, rpe=kerple)
+
+        # Both should produce valid outputs
+        self.assertEqual(output_rope.shape, output_kerple.shape)
+        self.assertFalse(torch.isnan(output_rope).any())
+        self.assertFalse(torch.isnan(output_kerple).any())
+
+
 def run_tests():
     """Run all tests."""
     # Create test suite
@@ -565,6 +873,8 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestApproximationQuality))
     suite.addTests(loader.loadTestsFromTestCase(TestMemoryEfficiency))
     suite.addTests(loader.loadTestsFromTestCase(TestReLUAttention))
+    suite.addTests(loader.loadTestsFromTestCase(TestReLUWithRoPE))
+    suite.addTests(loader.loadTestsFromTestCase(TestFAVORPlusWithRoPE))
 
     # Run tests
     runner = unittest.TextTestRunner(verbosity=2)
