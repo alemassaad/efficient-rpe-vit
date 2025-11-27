@@ -2,7 +2,7 @@
 
 ## ✅ Implementation Status
 
-### Fully Implemented Models (9 of 12)
+### Fully Implemented Models (11 of 12)
 
 | Model | Attention | RPE | Status |
 |-------|-----------|-----|--------|
@@ -12,19 +12,19 @@
 | `performer_favor` | FAVOR+ O(N) | None | ✅ Complete |
 | `performer_favor_most_general` | FAVOR+ O(N) | KERPLE | ✅ Complete |
 | `performer_favor_rope` | FAVOR+ O(N) | RoPE | ✅ Complete |
+| `performer_favor_circulant` | FAVOR+ O(N) | Circulant-STRING | ✅ Complete |
 | `performer_relu` | ReLU O(N) | None | ✅ Complete |
 | `performer_relu_most_general` | ReLU O(N) | KERPLE | ✅ Complete |
 | `performer_relu_rope` | ReLU O(N) | RoPE | ✅ Complete |
+| `performer_relu_circulant` | ReLU O(N) | Circulant-STRING | ✅ Complete |
 
-### TODO: Remaining Models (3 of 12)
-- `performer_favor_circulant` - FAVOR+ with Circulant-STRING
-- `performer_relu_circulant` - ReLU with Circulant-STRING
+### Incompatible Combination (1 of 12)
 - `baseline_most_general` (KERPLE incompatible with softmax by design)
 
 ### Key Implementation Notes
 - **KERPLE**: FFT-accelerated O(n log n), fully vectorized, 23 unit tests passing. See [`docs/KERPLE_DOCUMENTATION.md`](docs/KERPLE_DOCUMENTATION.md)
 - **RoPE**: Rotations applied to Q/K before attention, supports 2D vision positions
-- **Circulant-STRING**: Learnable relative position biases added to attention scores
+- **Circulant-STRING**: FFT-based matrix exponential rotation of Q/K, 23 unit tests passing. Based on Schenck et al., 2025. See [`docs/CIRCULANT_STRING_IMPLEMENTATION.md`](docs/CIRCULANT_STRING_IMPLEMENTATION.md)
 
 ### Initial Performance (3 epochs, MNIST)
 | Model | Accuracy | vs Baseline |
@@ -45,7 +45,7 @@ The primary technical challenge involves implementing RPE mechanisms within the 
 
 ## Model Architectures
 
-The framework supports 12 model variants combining 3 attention mechanisms with 4 positional encoding approaches. **9 are fully implemented**.
+The framework supports 12 model variants combining 3 attention mechanisms with 4 positional encoding approaches. **11 are fully implemented** (1 incompatible by design).
 
 | Category | Attention | RPE | Complexity | Status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -56,11 +56,11 @@ The framework supports 12 model variants combining 3 attention mechanisms with 4
 | **FAVOR+** | Linear (FAVOR+) | None | $\mathcal{O}(N)$ | ✅ |
 | | Linear (FAVOR+) | KERPLE | $\mathcal{O}(N \log N)$ | ✅ |
 | | Linear (FAVOR+) | RoPE | $\mathcal{O}(N)$ | ✅ |
-| | Linear (FAVOR+) | Circulant-STRING | $\mathcal{O}(N)$ | ⏳ TODO |
+| | Linear (FAVOR+) | Circulant-STRING | $\mathcal{O}(N)$ | ✅ |
 | **ReLU** | Linear (ReLU) | None | $\mathcal{O}(N)$ | ✅ |
 | | Linear (ReLU) | KERPLE | $\mathcal{O}(N \log N)$ | ✅ |
 | | Linear (ReLU) | RoPE | $\mathcal{O}(N)$ | ✅ |
-| | Linear (ReLU) | Circulant-STRING | $\mathcal{O}(N)$ | ⏳ TODO |
+| | Linear (ReLU) | Circulant-STRING | $\mathcal{O}(N)$ | ✅ |
 
 \* KERPLE requires linear attention for its FFT-based O(n log n) approach.
 
