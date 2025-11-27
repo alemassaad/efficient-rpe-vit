@@ -83,20 +83,22 @@ class SoftmaxAttention(BaseAttention):
         qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, heads, N, head_dim)
         q, k, v = qkv[0], qkv[1], qkv[2]  # Each: (B, heads, N, head_dim)
 
-        # Apply RoPE if provided (modifies Q and K before attention computation)
+        # Apply RPE if provided (modifies Q and K before attention computation)
+        # Both RoPE and Circulant-STRING apply rotations to Q/K
         if rpe is not None:
-            from ..rpe import RoPE
+            from ..rpe import RoPE, CirculantStringRPE
+
             if isinstance(rpe, RoPE):
+                # RoPE: Apply rotations to Q/K before attention
                 q, k = rpe.apply_rotary_emb(q, k)
+            elif isinstance(rpe, CirculantStringRPE):
+                # Circulant-STRING: Apply FFT-based rotation to Q/K
+                # Based on Schenck et al., 2025 "Learning the RoPEs"
+                # CLS token at index 0 is automatically excluded from rotation
+                q, k = rpe.apply_circulant_string(q, k)
 
         # Compute attention scores: Q @ K^T / sqrt(d)
         attn = (q @ k.transpose(-2, -1)) * self.scale  # (B, heads, N, N)
-
-        # Apply Circulant-STRING RPE if provided (adds bias to attention scores)
-        if rpe is not None:
-            from ..rpe import CirculantStringRPE
-            if isinstance(rpe, CirculantStringRPE):
-                attn = rpe.apply_bias(attn, seq_len=N)
 
         # Apply mask if provided
         if mask is not None:

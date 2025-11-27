@@ -175,12 +175,20 @@ class ReLUAttention(BaseAttention):
 
         # Handle different RPE types
         if rpe is not None:
-            from ..rpe import RoPE, KERPLEPositionalEncoding
+            from ..rpe import RoPE, KERPLEPositionalEncoding, CirculantStringRPE
 
             if isinstance(rpe, RoPE):
                 # RoPE: Apply rotations to Q/K BEFORE feature map
                 # RoPE encodes relative position via rotation, works with any attention
                 q, k = rpe.apply_rotary_emb(q, k)
+                # Then apply standard ReLU scaling
+                q = q * self.relu_scale
+                k = k * self.relu_scale
+            elif isinstance(rpe, CirculantStringRPE):
+                # Circulant-STRING: Apply FFT-based rotation to Q/K
+                # Based on Schenck et al., 2025 "Learning the RoPEs"
+                # CLS token at index 0 is automatically excluded from rotation
+                q, k = rpe.apply_circulant_string(q, k)
                 # Then apply standard ReLU scaling
                 q = q * self.relu_scale
                 k = k * self.relu_scale
